@@ -10,98 +10,149 @@
  * ...................................................................................
  * SCOM: Single Class Object Model (http://code.google.com/p/scom/)
  * Licence: MIT (http://en.wikipedia.org/wiki/MIT_License)
- * Michel Kern - 28 may 2012 - 22:52
+ * Michel Kern - 10 june 2012 - 22:46
  * Copyright (C) <2012> www.terimakasi.com
+ * ...................................................................................
+ * ToDo:
+ * - Readme.md or Readme.html ?
+ * - Automatic tests for regression check
+ * - Check if Windows/Unix to adapt (e.g: GetDesktop(),...):
+ *   - Text editor (Notepad/vi)
+ * - Events / Hooks / Callbacks ?
+ *   - Simulation of digital electronic components (e.g: logic gates)
+ * - Environment
+ *   - Implement 'Plugins' for self-extensibility of 'environment'
+ *     - SHELL          could be a Plugin !
+ *     - TextFileWriter could be a Plugin !
+ *   - 'ERROR' variable which stores a message about last error
+ * - Shell: 
+ *   - if input ends with ';' then interpret it as Javascript
+ *   - 'info' command in Shell: show version, instance count, plugins
+ *   - 'exec' command
+ *   - 'run' command (runs commands from a script file)
+ *   - 'history' command
+ *   - implement 'history' with up/down arrow keys
+ * - StringWriter and TextFileWriter as instances of 'Writer' (check in SHELL with 'list Writer')
+ * - Writer:
+ *   - RDF / Owl / JSon
+ *   - Database !
+ *   - D3/JS Graph drawing
+ *   - Html (1 file per object/facet and links)
+ *   - GraphViz format
+ * - Reader !
+ *   - e.g: read graph from Git or from url
+ *   - Database !
+ * - API consistency: 
+ *   - get rid of 'NewValue()'
+ *   - getValue() and 'VALUE' facet should be only 2 different means to access value 
+ * - AOM:
+ *   - New Integer,...: .next should not be NIL
+ *   - Allow to define name when instanciating a class (e.g: New(name, class_it))
+ *   - Chain Inheritance (attributes of superclasses recursively)
+ *   - 'implement IInterface' cf. Java and allow implementations of multiple 'Interface' classes
+ *   - Multiple values for _value of an It instance (getValue() = get(0) and add getValue(index) and valueCount) 
+ *   - Scope/Context for a facet (ex: localization of 'NAME')
+ * - Port to JVM !
+ * ...................................................................................
  */
 package scom;
 
-import java.io.*; 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Set;
-import java.util.Iterator;
-import java.util.UUID;
-import java.lang.Class;
-import java.lang.Integer;
+import java.io.*;
 import java.lang.reflect.Constructor;
 import java.util.*;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
 
-public class It implements java.util.Map.Entry<Object, Object> 
-                
+public class It implements java.util.Map.Entry<Object, Object>               
 {
-  public static final String BASENAME   = It.class.getSimpleName();
-  public static final String CLASS_NAME = It.class.getCanonicalName();
+  public static final String               VERSION                  = "0.1.9";
+  public static final String               BASENAME                 = It.class.getSimpleName();
+  public static final String               CLASS_NAME               = It.class.getCanonicalName();
   
   private static      HashMap<String, It>  _Instance_map            = new HashMap<String, It>();
     
   public static final String               K_NIL                    = "NIL";
-  public static       It                   NIL                      = new It(K_NIL, K_NIL, K_NIL);
-
-  public static       It                   ID                       = new It("id", "id", K_NIL);  
+  public static final It                   NIL                      = new It(K_NIL, K_NIL, K_NIL);
+  
+  private static final String              _K_ID                    = "id";
+  public static final It                   ID                       = new It(_K_ID, _K_ID, K_NIL); 
+  
+  public static final String               K_VALUE                  = "value";
+    
   public static       It                   NAME;
+  public static       It                   INTERFACE;
   public static       It                   COUNT;
   
   public static       It                   STRING_WRITER;
   public static       It                   TEXT_FILE_WRITER;
   
-  public static final String               K_FUNCTION               = "function";
-  
-  public static final String               K_VALUE                  = "value";
   public static       It                   VALUE;
+  public static       It                   SCRIPT_F;
   
-  public static final String               K_CLASS                  = "class";
-  public static final String               K_SUPERCLASS             = "superclass";
-
   public static final String               K_MODEL_LAYER            = "model_layer";
   
-  public static final String               V_CLASS_MODEL            = "class_model";
-  public static final It                   CLASS_MODEL              = new It(V_CLASS_MODEL, V_CLASS_MODEL, K_NIL);
+  private static final String              _K_CLASS_MODEL           = "class_model";
+  public static final It                   CLASS_MODEL              = new It(_K_CLASS_MODEL, _K_CLASS_MODEL, K_NIL);
   
   public static final String               V_USER_MODEL             = "user_model";
   public static final It                   USER_MODEL               = new It(V_USER_MODEL, V_USER_MODEL, K_NIL);
-  
-  public static final String               K_NEW_F                  = "new()";
   public static       It                   NEW_F;
   
-  public static final String               K_METACLASS              = "Class";
+  public static       It                   META_METACLASS           = null;
   public static       It                   METACLASS                = null;
+  public static       It                   INTERFACE_METACLASS      = null;
   public static       int                  _init_count              = 0;
   
-  public static final String               K_OBJECT                 = "Object";
   public static       It                   OBJECT;                  // Caution: don't initialize with null
-  
-  public static final String               K_DOUBLE                 = "Double";
   public static       It                   DOUBLE;                  // Caution: don't initialize with null
-  
-  public static final String               K_INTEGER                = "Integer";
   public static       It                   INTEGER;                 // Caution: don't initialize with null
-  
-  public static final String               K_STRING                 = "String";
   public static       It                   STRING;                  // Caution: don't initialize with null
-  
-  public static final String               K_COMMAND                = "Command";
+  public static       It                   WRITER;                  // Caution: don't initialize with null
   public static       It                   COMMAND;                 // Caution: don't initialize with null
   
-  public static final String               K_TRUE                   = "true";
-  public static       It                   TRUE                     = new It(K_TRUE, K_TRUE, K_TRUE);
+  private static final String              _K_TRUE                  = "true";
+  public static       It                   TRUE                     = new It(_K_TRUE, _K_TRUE, _K_TRUE);
   
-  public static final String               K_ENVIRONMENT            = "Environment";
-  public static       It                   ENVIRONMENT              = GetEnvironment();
-  
+  public static       It                   ENVIRONMENT              = GetEnvironment_();
   public static       It                   SHELL;
   
   public static final int                  WITHOUT_DEPTH            = -1;
   public static final int                  WITH_UNLIMITED_DEPTH     = 0;
+  protected static    String               _String_writer_str;
   
   protected           HashMap<It, It>      _facet_map               = new HashMap<It, It>();
-    
   protected           HashMap<String, It>  _kv2it                   = new HashMap<String, It>();
   protected final     Object               _key;
   protected           Object               _value                   = NIL;
   protected           Object               _next                    = NIL;
   protected final     UUID                 _uuid                    = UUID.randomUUID();
   
-  public static       String               _string_writer_str;
+  //............. internal purpose .............
+  private static final String              _K_EMPTY_STRINg          = "";
+  //
+  private static final String              _K_NAME                  = "name";
+  private static final String              _K_COUNT                 = "count";
+  private static final String              _K_CLASS                 = "class";
+  private static final String              _K_SUPERCLASS            = "superclass";
+  private static final String              _K_NEW_F                 = "new()";
+  private static final String              _K_SCRIPT_F              = "script()";
+  private static final String              _K_FUNCTION              = "function";
+  private static final String              _K_INTERFACE             = "interface";
+  private static final String              _K_ENVIRONMENT           = "environment";
+  private static final String              _K_SHELL                 = "shell";
+  //
+  private static final String              _K_META_METACLASS        = "MetaClass";
+  private static final String              _K_METACLASS             = "Class";
+  private static final String              _K_INTERFACE_METACLASS   = "Interface";
+  private static final String              _K_OBJECT                = "Object";
+  private static final String              _K_INTEGER               = "Integer";
+  //public static final String               _K_FLOAT                 = "Float";
+  private static final String              _K_STRING                = "String";
+  private static final String              _K_COMMAND               = "Command";
+  private static final String              _K_WRITER                = "Writer";
+  private static final String              _K_STRING_WRITER         = "StringWriter";
+  private static final String              _K_TEXT_FILE_WRITER      = "TextFileWriter";
+  //............. internal purpose .............
   
   //*** Private Constructor: API clients must use factory method 'New' instead
   // Usage: if provided key is empty string ("") then it will be replaced by instance's UUID
@@ -119,10 +170,10 @@ public class It implements java.util.Map.Entry<Object, Object>
     
     if (IsString(key))
     {
-      String key_str   = CastToString(key);
+      String key_str = CastToString(key);
       _Instance_map.put(key_str, this);
     }
-  } // Private Constructor
+  } // Private Constructor (use 'New' helper method to instanciate It)
   
   // special use: store instance's 'ID' facet (uuid)
   protected It(Object key, Object value) 
@@ -132,13 +183,13 @@ public class It implements java.util.Map.Entry<Object, Object>
     _next  = NIL;
   } // Private Constructor
   
-  static protected It GetEnvironment()
+  static protected It GetEnvironment_()
   {
     if (ENVIRONMENT == null)
-      ENVIRONMENT = new It(K_ENVIRONMENT, K_ENVIRONMENT, K_NIL);
+      ENVIRONMENT = new It(_K_ENVIRONMENT, _K_ENVIRONMENT, K_NIL);
     
     return ENVIRONMENT;
-  } //---- GetEnvironment
+  } //---- GetEnvironment_
   
   protected void initEnvironment()
   {
@@ -146,45 +197,54 @@ public class It implements java.util.Map.Entry<Object, Object>
       return;
     
     _init_count++;
-    GetEnvironment();
+    GetEnvironment_();
     
-    SHELL            = new It("shell",      "shell",       K_NIL); 
-    NAME             = new It("name",       "name",        K_NIL);  
-    NEW_F            = new It(K_NEW_F,      K_NEW_F,       K_NIL);
-    VALUE            = new It(K_VALUE,      K_VALUE,       K_NIL);
+    VALUE            = new It(K_VALUE,             K_VALUE,             K_NIL);
+    SHELL            = new It(_K_SHELL,            _K_SHELL,            K_NIL); 
+    NAME             = new It(_K_NAME,             _K_NAME,             K_NIL);  
+    NEW_F            = new It(_K_NEW_F,            _K_NEW_F,            K_NIL);
+    SCRIPT_F         = new It(_K_SCRIPT_F,         _K_SCRIPT_F,         K_NIL);
+    INTERFACE        = new It(_K_INTERFACE,        _K_INTERFACE,        K_NIL);
     
-    STRING_WRITER    = new It("StringWriter", "StringWriter", K_NIL);
-    TEXT_FILE_WRITER = new It("FileWriter",   "FileWriter",   K_NIL);
+    STRING_WRITER    = new It(_K_STRING_WRITER,    _K_STRING_WRITER,    K_NIL);
+    TEXT_FILE_WRITER = new It(_K_TEXT_FILE_WRITER, _K_TEXT_FILE_WRITER, K_NIL);
     
-    COUNT  = new It("count",  "count",   K_NIL)
+    COUNT  = new It(_K_COUNT,  _K_COUNT,   K_NIL)
       .putFacet(K_MODEL_LAYER, CLASS_MODEL);
     
     // http://en.wikipedia.org/wiki/Metaclass  
-    METACLASS = NewNativeClass_(K_METACLASS, NIL, NIL);       // NB: don't add 'COUNT' value yet, INTEGER is required  
+    META_METACLASS = NewNativeClass_(_K_META_METACLASS, NIL, NIL);   // NB: don't add 'COUNT' value yet, INTEGER is required  
     
-    OBJECT = NewNativeClass_(K_OBJECT, METACLASS, NIL);       // NB: don't add 'COUNT' value yet, INTEGER is required 
+    METACLASS = NewNativeClass_(_K_METACLASS, META_METACLASS, NIL); // NB: don't add 'COUNT' value yet, INTEGER is required  
+    INTERFACE_METACLASS = NewNativeClass_(_K_INTERFACE_METACLASS, META_METACLASS, NIL); // NB: don't add 'COUNT' value yet, INTEGER is required  
+    
+    OBJECT = NewNativeClass_(_K_OBJECT, METACLASS, NIL);        // NB: don't add 'COUNT' value yet, INTEGER is required 
       OBJECT.putFacet(VALUE,            NIL);
     
-    INTEGER = NewNativeClass_(K_INTEGER, METACLASS, OBJECT);  // NB: don't add 'COUNT' value yet, INTEGER is required 
+    INTEGER = NewNativeClass_(_K_INTEGER, METACLASS, OBJECT);   // NB: don't add 'COUNT' value yet, INTEGER is required 
       INTEGER.putFacet(VALUE,           New(0)); 
       
-    STRING = NewNativeClass_(K_STRING,  METACLASS, OBJECT);    // NB: don't add 'COUNT' value yet, INTEGER is required 
-      STRING.putFacet(VALUE,            New("")); 
+    STRING = NewNativeClass_(_K_STRING,  METACLASS, OBJECT);   // NB: don't add 'COUNT' value yet, INTEGER is required 
+      STRING.putFacet(VALUE,            New(_K_EMPTY_STRINg)); 
       
-    COMMAND = NewNativeClass_(K_COMMAND,METACLASS, OBJECT);    // NB: don't add 'COUNT' value yet, INTEGER is required 
-      COMMAND.putFacet(VALUE,           New("")); 
+    WRITER = NewNativeClass_(_K_WRITER, METACLASS, OBJECT);    // NB: don't add 'COUNT' value yet, INTEGER is required 
+      WRITER.putFacet(VALUE,            New(_K_EMPTY_STRINg));
+      
+    COMMAND = NewNativeClass_(_K_COMMAND, METACLASS, OBJECT);  // NB: don't add 'COUNT' value yet, INTEGER is required 
+      COMMAND.putFacet(SCRIPT_F,        New(_K_EMPTY_STRINg)); 
     
+    META_METACLASS.putFacet(COUNT,      New(1)); // NB: requires INTEGER so don't move this code up (OBJECT creation)
     METACLASS.putFacet(COUNT,           New(4)); // NB: requires INTEGER so don't move this code up (OBJECT creation)
     OBJECT.putFacet(COUNT,              New(0));
     INTEGER.putFacet(COUNT,             New(0)); 
     STRING.putFacet(COUNT,              New(0));
     COMMAND.putFacet(COUNT,             New(0));
     
-    ENVIRONMENT.putFacet(K_METACLASS,   METACLASS)
-               .putFacet(K_OBJECT,      OBJECT) 
-               .putFacet(K_INTEGER,     INTEGER)
-               .putFacet(K_STRING,      STRING) 
-               .putFacet(K_COMMAND,     COMMAND); 
+    ENVIRONMENT.putFacet(_K_METACLASS,  METACLASS)
+               .putFacet(_K_OBJECT,     OBJECT) 
+               .putFacet(_K_INTEGER,    INTEGER)
+               .putFacet(_K_STRING,     STRING) 
+               .putFacet(_K_COMMAND,    COMMAND); 
   } //---- initEnvironment
   
   
@@ -206,7 +266,7 @@ public class It implements java.util.Map.Entry<Object, Object>
     
     String instance_name = instance_base_name + instance_count;
     It instance_it = new It(instance_name, instance_name, NIL);
-      instance_it.putFacet(K_CLASS, class_it);
+      instance_it.putFacet(_K_CLASS, class_it);
     //---- Instanciate class
     
       
@@ -280,22 +340,22 @@ public class It implements java.util.Map.Entry<Object, Object>
   //---------- New
   
   
-  //---------- NewClass ----------
-  static public It NewClass(String class_name)
-  {  return NewClass(class_name, METACLASS);  }
-  static public It NewClass(String class_name, It metaclass_it)
-  {  return NewClass(class_name, metaclass_it, OBJECT);  }
-  static public It NewClass(String class_name, It metaclass_it, It super_it)
+  //---------- New Class ----------
+  static public It New(String class_name, It metaclass_it)
+  {   
+    return New(class_name, METACLASS, OBJECT);  
+  }
+  static public It New(String class_name, It metaclass_it, It super_it)
   {  
     //System.out.println("It.NewClass class_name:" + class_name + "  class:" + metaclass_it + "  super:" + super_it);
-    if (! IsClass(metaclass_it))  return It.NIL;
+    if (! IsClass(metaclass_it))  return NIL;
     
     It new_class = new It(class_name, class_name, K_NIL);
       new_class.putFacet      (NAME,         new_class);
       new_class.putFacet      (COUNT,        New(0));
-      new_class.putClassFacet_(K_CLASS,      metaclass_it);
-      new_class.putClassFacet_(K_NEW_F,      new_class);
-      new_class.putClassFacet_(K_SUPERCLASS, super_it);
+      new_class.putClassFacet_(_K_CLASS,     metaclass_it);
+      new_class.putClassFacet_(_K_NEW_F,     new_class);
+      new_class.putClassFacet_(_K_SUPERCLASS, super_it);
       
       ENVIRONMENT.putFacet(class_name, new_class);
           
@@ -305,43 +365,8 @@ public class It implements java.util.Map.Entry<Object, Object>
       count_it.setValue(instance_count.toString());
       //---- increment count of class intances
     return new_class;
-  } //---- NewClass
-  
-  
-  static public boolean IsClass(It o_it)
-  {
-    if (o_it == null)             return false;
-    if (o_it == NIL)              return false;
-    
-    It  metaclass_it = o_it.getFacet(K_CLASS);
-    if (metaclass_it == NIL)      return false;
-    
-    It  count_it = o_it.getFacet(COUNT);
-    if (count_it == NIL)          return false;
-    
-    It  new_f_it = o_it.getFacet(K_NEW_F);
-    if (new_f_it == NIL)          return false;
-    
-    It  superclass_it = o_it.getFacet(K_SUPERCLASS);
-    if (superclass_it == NIL)     return false;
-    
-    return true;
-  } //---- IsClass 
-  
-  
-  static protected It IsNIL_(Object key, Object value)
-  {
-    if (key == null || value == null)     
-      return NIL;
-    
-    String key_str   = CastToString(key);
-    String value_str = CastToString(value);
-    
-    if (key_str == K_NIL && value_str == K_NIL)
-      return NIL;
-      
-    return null;
-  } //---- IsNIL_()
+  }
+  //---------- New Class ----------
   
   
   private static String KeyValue_(Object key, Object value)
@@ -375,41 +400,37 @@ public class It implements java.util.Map.Entry<Object, Object>
       return New(this);
     
     if (this == SHELL)
-    {
       RunShell_();
-    }
+    else if (this.isInstanceOf(COMMAND))
+      return New(runJavascript_());
+    
     return this;
   }
   //---------- evaluate
   
   
-  //---------- NewValue ----------
+  //---------- New Value (e.g: Integer, String, ...) ----------
   static public It New(Integer value)
   { 
      It new_integer = New(INTEGER, NIL);
      new_integer.setValue(value);
      return new_integer;
-  } // New (NewValue Integer)
-  
+  } // New Integer
   static public It New(Float value)
-  {  
-    //return New(value.toString(), It.NIL);  
+  {   
     return New(value, value);  // ToDo: .next is not NIL
-  } // New (NewValue Float)
-  
+  } // New Float
   static public It New(Double value)
   {  
-    //return New(value.toString(), It.NIL);
     return New(value, value);  // ToDo: .next is not NIL
-  } // New (NewValue Double)
-  
+  } // New Double
   static public It New(String value)
   {  
-    //return NewValue(value, NIL);
     It new_string = New(STRING, NIL);
     new_string.setValue(value);
     return new_string;
-  } // New (NewValue String)
+  } // New String
+  //---------- New Value (e.g: Integer, String, ...) ----------
   
   // Caution !! Regression if replaced by New ( String)
   static private It NewValue(String value)
@@ -518,7 +539,7 @@ public class It implements java.util.Map.Entry<Object, Object>
   {
     It  function_it = ENVIRONMENT.getFacet(function_name);
     if (function_it == NIL)
-      function_it = New(K_FUNCTION, class_name, class_name);
+      function_it = New(_K_FUNCTION, class_name, class_name);
 
     return function_it;
   } //---- getFunction
@@ -580,6 +601,56 @@ public class It implements java.util.Map.Entry<Object, Object>
     {}
     return false;
   } //---- IsIt
+  
+  static public boolean IsClass(It o_it)
+  {
+    if (o_it == null)             return false;
+    if (o_it == NIL)              return false;
+    
+    It  metaclass_it = o_it.getFacet(_K_CLASS);
+    if (metaclass_it == NIL)      return false;
+    
+    It  count_it = o_it.getFacet(COUNT);
+    if (count_it == NIL)          return false;
+    
+    It  new_f_it = o_it.getFacet(_K_NEW_F);
+    if (new_f_it == NIL)          return false;
+    
+    It  superclass_it = o_it.getFacet(_K_SUPERCLASS);
+    if (superclass_it == NIL)     return false;
+    
+    return true;
+  } //---- IsClass 
+  
+  public boolean isInstanceOf(It o_it)
+  {
+    if (o_it == null)             return false;
+    if (o_it == NIL)              return false;
+    
+    if (! IsClass(o_it))          return false;
+    
+    //System.out.println("isInstanceOf item: " + this.toString());
+    if (getFacet(_K_CLASS)==NIL)   return false;
+    
+    It class_it = this.getFacet(_K_CLASS);
+    if (class_it == o_it)
+      return true;
+    return false;
+  } //---- isInstanceOf 
+  
+  static protected It IsNIL_(Object key, Object value)
+  {
+    if (key == null || value == null)     
+      return NIL;
+    
+    String key_str   = CastToString(key);
+    String value_str = CastToString(value);
+    
+    if (key_str == K_NIL && value_str == K_NIL)
+      return NIL;
+      
+    return null;
+  } //---- IsNIL_()
   
   static public boolean IsString(Object o) 
   {
@@ -663,18 +734,18 @@ public class It implements java.util.Map.Entry<Object, Object>
   {
     It native_class = NIL;
     native_class = new It(class_name, class_name, K_NIL);
-    if (class_name.equals(K_METACLASS))
-      native_class.putClassFacet_(K_CLASS,      native_class);
+    if (class_name.equals(_K_META_METACLASS))
+      native_class.putClassFacet_(_K_CLASS,      native_class);
     else
-      native_class.putClassFacet_(K_CLASS,      class_it); 
+      native_class.putClassFacet_(_K_CLASS,      class_it); 
     
     native_class.putFacet(NAME,                 native_class);
-    native_class.putClassFacet_(K_NEW_F,        native_class); 
+    native_class.putClassFacet_(_K_NEW_F,        native_class); 
     
     if (superclass_it == NIL)
-      native_class.putClassFacet_(K_SUPERCLASS, native_class);
+      native_class.putClassFacet_(_K_SUPERCLASS, native_class);
     else
-      native_class.putClassFacet_(K_SUPERCLASS, superclass_it);
+      native_class.putClassFacet_(_K_SUPERCLASS, superclass_it);
     
     return native_class;
   } //---- NewNativeClass_
@@ -715,7 +786,7 @@ public class It implements java.util.Map.Entry<Object, Object>
   static public String Print(It item, It writer_it, int depth, String indent_title, String option, boolean first_call)
   {  
     if (first_call)
-      _string_writer_str = "";
+      _String_writer_str = "";
     
     String suffix = "";
     if (depth != WITHOUT_DEPTH)
@@ -737,12 +808,12 @@ public class It implements java.util.Map.Entry<Object, Object>
         output_str = indent_title + "  " + facet.getValue() + ": " + facet_value.getValue();
         Print_(output_str, filename, indent_title, item, writer_it, false);
       
-        if (depth>=0 && IsIt(facet_value) && facet_value.getFacet(K_CLASS) != NIL)
+        if (depth>=0 && IsIt(facet_value) && facet_value.getFacet(_K_CLASS) != NIL)
           if (facet_value != item) // to avoid infinite metaclass recursion: class(Class) = Class
             Print((It)facet_value, writer_it, depth + 1, indent_title + "    ", filename, false);
       }
     }
-    return _string_writer_str;
+    return _String_writer_str;
   } //---- Print (It)
   
   static private String Print_(String message, String filename, String indent_title, It item, It writer_it, boolean first_call)
@@ -780,11 +851,11 @@ public class It implements java.util.Map.Entry<Object, Object>
     {
       if (first_call)
       {
-        _string_writer_str = "";
-        _string_writer_str += message;
+        _String_writer_str = "";
+        _String_writer_str += message;
       }
       else
-        _string_writer_str += "\n" + indent_title + message;
+        _String_writer_str += "\n" + indent_title + message;
     }
     else
       System.out.println(message);
@@ -795,9 +866,16 @@ public class It implements java.util.Map.Entry<Object, Object>
   static private void RunShell_()
   {
     boolean         loop_enabled = true;
-    BufferedReader  reader       = new BufferedReader(new InputStreamReader(System.in));   
+    BufferedReader  reader       = new BufferedReader(new InputStreamReader(System.in)); 
+    boolean         first_time   = true;
     while (loop_enabled)
     {
+      if (first_time)
+      {
+        System.out.print("SCOM Shell " + VERSION + " is ready.\n");
+        System.out.print("Type 'help' to get help.\n");
+        first_time = false;
+      }
       System.out.print("> ");
       String input_str  = "";
       String output_str = "";
@@ -820,30 +898,110 @@ public class It implements java.util.Map.Entry<Object, Object>
             || input_str.toLowerCase().equals("h")
             || input_str.toLowerCase().equals("help"))
         {
-          output_str =     "?, h, help:                         prints this text\n"
-                       + "  help command:                       list available commands\n"
-                       + "  q, quit or exit:                    exits Shell";
-          System.out.println("  " + output_str);
-        }
-        //---------- help command ----------
-        else if (input_str.toLowerCase().trim().replace(" ", "").equals("helpcommand"))
-        {
-          output_str =     "print 'variable' (or p 'variable'): prints value of variable (e.g: print Object)\n"
-                       + "  new:                                creates an 'Object' instance\n" 
-                       + "  new 'class':                        creates an instance of 'class' (eg: new Integer)\n" 
-                       + "  ?, h, help:                         prints this text\n"
-                       + "  help command:                       list available commands\n"
-                       + "  q, quit or exit:                    exits Shell";
+          output_str =     "print VARIABLE           prints value of VARIABLE (e.g: print Object)\n"
+                       + "  eval VARIABLE            evaluates VARIABLE (e.g: eval command1\n"
+                       + "  set VARIABLE VALUE       sets VALUE of VARIALE (e.g: set command1 print('Hello');\n" 
+                       + "  edit VARIABLE            edit value of VARIABLE in default editor\n" 
+                       + "  new [CLASS]              creates an CLASS instance (CLASS is 'Object' if not\n" 
+                       + "                           provided. eg: new Integer)\n" 
+                       + "  list CLASS               lists all instances of CLASS (eg: list Command)\n"
+                       + "  ?, h, help:              prints this text\n"
+                       + "  q, quit or exit:         exits this Shell";
           System.out.println("  " + output_str);
         }
         //---------- print ----------
         else if (  tokens.size()==2 
-                && (tokens.get(0).equals("print") || tokens.get(0).equals("p")))
+                && (tokens.get(0).equals("print")))
         {
           It item = _Instance_map.get(tokens.get(1));
           if (item == null)
             item = NIL;
           output_str = Print(item, STRING_WRITER);
+          System.out.println(IndentLines_(output_str));
+        }
+        //---------- list ----------
+        else if (  tokens.size()==2 
+                && (tokens.get(0).equals("list")))
+        {
+          It class_it = _Instance_map.get(tokens.get(1));
+          if (class_it == null)
+            class_it = NIL;
+          output_str = "";
+          if (IsClass(class_it))
+          {
+            Set<String>  instance_names = _Instance_map.keySet();
+            Iterator<String> iterator   = instance_names.iterator();
+            while (iterator.hasNext())
+            {
+              String instance_name = iterator.next();
+              It     instance      = _Instance_map.get(instance_name);
+              if (instance.isInstanceOf(class_it))
+                output_str += Print(instance_name + "\n", STRING_WRITER);  
+            }
+            if (output_str != "")
+              System.out.println(IndentLines_(output_str));
+          }
+        }
+        //---------- edit ----------
+        else if (  tokens.size()==2 
+                && (tokens.get(0).equals("edit")))
+        {
+           It item = _Instance_map.get(tokens.get(1));
+           if (item == null)
+             item = NIL;
+          
+           if (item != NIL)
+           {
+             String         filename = "facet_value.txt";
+             
+             boolean success = (new File(filename)).delete();
+             
+             FileWriter     fstream  = new FileWriter(filename);
+             BufferedWriter out      = new BufferedWriter(fstream);
+         
+             It value_it = NIL;
+             if (item.isInstanceOf(COMMAND))
+               value_it = item.getFacet(SCRIPT_F); 
+             else
+               value_it = item.getFacet(VALUE);            
+             out.write(value_it.toString());
+             out.close();
+           
+             Runtime runtime = Runtime.getRuntime();
+             Process process = runtime.exec("notepad.exe " + filename);
+             process.waitFor();
+             String new_value_str = ReadFileAsString_(filename);
+             if (item.isInstanceOf(COMMAND))
+               item.putFacet(SCRIPT_F, New(new_value_str)); 
+             else
+               item.putFacet(VALUE, New(new_value_str)); 
+           }
+           output_str = Print(item, STRING_WRITER);
+           System.out.println(IndentLines_(output_str));
+        }
+        //---------- set ----------
+        else if (  tokens.size()>=3 
+                && (tokens.get(0).equals("set")))
+        {
+          It item = _Instance_map.get(tokens.get(1));
+          if (item == null)
+            item = NIL;
+          String value_str = tokens.get(2);
+          if (item.isInstanceOf(COMMAND))
+            item.putFacet(SCRIPT_F, New(value_str));
+          else
+            item.putFacet(VALUE, New(value_str));
+          output_str = Print(item, STRING_WRITER);
+          System.out.println(IndentLines_(output_str));
+        }
+        //---------- eval ----------
+        else if (  tokens.size()==2 
+                && (tokens.get(0).equals("eval")))
+        {
+          It item = _Instance_map.get(tokens.get(1));
+          if (item == null)
+            item = NIL;
+          output_str = item.evaluate().toString();
           System.out.println(IndentLines_(output_str));
         }
         //---------- new ----------
@@ -870,18 +1028,64 @@ public class It implements java.util.Map.Entry<Object, Object>
           loop_enabled = false;
         else
         {
-          output_str = input_str;
-          System.out.println("  " + output_str);
+          // check if first token is a Command instance
+          if (tokens.size()==1) 
+          {
+            It command_it = _Instance_map.get(tokens.get(0));
+            if (command_it != null && command_it.isInstanceOf(COMMAND))
+            {
+              output_str = command_it.evaluate().toString();
+              System.out.println(IndentLines_(output_str));
+            }
+            else
+            {
+              // Unknown command
+              output_str = "Unknown command: " + tokens.get(0) + "\n  use 'help' for a list of available commands";
+              System.out.println("  " + output_str);
+            }
+          }
         }
       }
       catch (Exception e) {}
     }
   } //---- RunShell_
-  
+ 
+  // http://docs.oracle.com/javase/6/docs/technotes/guides/scripting/programmer_guide/index.html#helloworld
+  private String runJavascript_()
+  {
+    String output_str = "";
+    try
+    {
+      // create a script engine manager
+      ScriptEngineManager factory = new ScriptEngineManager();
+      
+      // create a JavaScript engine
+      ScriptEngine        engine  = factory.getEngineByName("JavaScript");
+      
+      // Redirect the engine's standard output to a StringWriter instance.
+      StringWriter writer = new StringWriter ();
+      PrintWriter  pw     = new PrintWriter(writer, true);
+      engine.getContext().setWriter(pw);
+
+      String script = this.getFacet(SCRIPT_F).toString();
+      engine.eval(script);
+
+      // Obtain the string buffer's contents and output these contents.
+      StringBuffer sb = writer.getBuffer();
+      output_str      = sb.toString();
+    }
+    catch (Exception e) 
+    {
+      // Syntax error in Javascript
+      output_str = e.getMessage();
+    }
+    return output_str;
+  } //---- runJavascript_
+
   static private String IndentLines_(String message)
   {
-    String[] lines = message.split("\n");
-    String output_str = "";
+    String[] lines      = message.split("\n");
+    String   output_str = "";
     for (int i=0; i<lines.length; i++)
     {
       output_str += "  " + lines[i];
@@ -890,4 +1094,34 @@ public class It implements java.util.Map.Entry<Object, Object>
     }
     return output_str;
   } //---- IndentLines_
+  
+  private static String ReadFileAsString_(String filename)
+  {
+    try
+    {
+      StringBuffer   fileData = new StringBuffer(1000);
+      BufferedReader reader   = new BufferedReader(new FileReader(filename));
+      char[]         buf      = new char[1024];
+      int            numRead  = 0;
+      while((numRead = reader.read(buf)) != -1)
+      {
+        String readData = String.valueOf(buf, 0, numRead);
+        fileData.append(readData);
+        buf = new char[1024];
+      }
+      reader.close();
+      return fileData.toString();
+    }
+    catch (Exception e) 
+    {
+      System.out.println(e.getMessage());
+    }
+    return "";
+  } //---- ReadFileAsString_
+  
+  public static void main(String[] args) 
+  {
+    // Calls interactive command shell
+    SHELL.evaluate();
+  } //---- main()
 } //---------- It
